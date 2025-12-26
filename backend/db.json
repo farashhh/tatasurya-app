@@ -1,0 +1,199 @@
+{
+  "users": [
+    {
+      "id": "75aa8e04-8fb1-4bd2-93fa-edece097ab99",
+      "name": "faras",
+      "email": "faras@gmail.com",
+      "passwordHash": "$2a$10$luTi7nwhIduMnCZ7dFxaRuKJn.jwq5POKXkYMR2OE7pKcRIVX3n8.",
+      "role": "murid",
+      "createdAt": "2025-12-26T07:46:38.340Z"
+    },
+    {
+      "id": "e5cfb710-a7b5-4e5a-b9a8-db73c18794ac",
+      "name": "farash",
+      "email": "farash@gmail.com",
+      "passwordHash": "$2a$10$ccC.zxehsObo07Bxo8.jk.60AWOjLl7RHYoPYkiQmviJ.gmdoy9Cq",
+      "role": "guru",
+      "createdAt": "2025-12-26T07:47:48.252Z"
+    }
+  ],
+  "planets": [
+    {
+      "id": "mercury",
+      "name": "Merkurius",
+      "order": 1,
+      "radius": 0.38,
+      "distanceAU": 0.39,
+      "color": "#b6b6b6",
+      "summary": "Planet terdekat dari Matahari, berbatu, dengan suhu ekstrem antara siang dan malam."
+    },
+    {
+      "id": "venus",
+      "name": "Venus",
+      "order": 2,
+      "radius": 0.95,
+      "distanceAU": 0.72,
+      "color": "#d9b38c",
+      "summary": "Planet terpanas dengan atmosfer tebal CO₂ dan awan asam sulfat."
+    },
+    {
+      "id": "earth",
+      "name": "Bumi",
+      "order": 3,
+      "radius": 1,
+      "distanceAU": 1,
+      "color": "#3aa0ff",
+      "summary": "Satu-satunya planet yang diketahui mendukung kehidupan, kaya air cair dan atmosfer pelindung."
+    },
+    {
+      "id": "mars",
+      "name": "Mars",
+      "order": 4,
+      "radius": 0.53,
+      "distanceAU": 1.52,
+      "color": "#d14b2a",
+      "summary": "Planet merah dengan gunung berapi raksasa dan bukti masa lalu yang mungkin lebih basah."
+    },
+    {
+      "id": "jupiter",
+      "name": "Jupiter",
+      "order": 5,
+      "radius": 11.21,
+      "distanceAU": 5.2,
+      "color": "#c9a46b",
+      "summary": "Raksasa gas terbesar, memiliki Bintik Merah Besar dan banyak satelit."
+    },
+    {
+      "id": "saturn",
+      "name": "Saturnus",
+      "order": 6,
+      "radius": 9.45,
+      "distanceAU": 9.58,
+      "color": "#e0c27b",
+      "summary": "Raksasa gas dengan cincin paling menonjol yang tersusun dari es dan debu."
+    },
+    {
+      "id": "uranus",
+      "name": "Uranus",
+      "order": 7,
+      "radius": 4.01,
+      "distanceAU": 19.2,
+      "color": "#8ad6e6",
+      "summary": "Raksasa es dengan kemiringan sumbu ekstrem sehingga tampak ‘berguling’ mengelilingi Matahari."
+    },
+    {
+      "id": "neptune",
+      "name": "Neptunus",
+      "order": 8,
+      "radius": 3.88,
+      "distanceAU": 30.05,
+      "color": "#2b55ff",
+      "summary": "Raksasa es terluar dengan angin sangat kencang dan badai gelap."
+    }
+  ],
+  "materials": [
+    {
+      "id": "mat-earth-1",
+      "planetId": "earth",
+      "title": "Mengapa Bumi Layak Huni?",
+      "content": "Bumi memiliki air dalam bentuk cair, atmosfer yang kaya nitrogen dan oksigen, serta magnetosfer yang melindungi dari radiasi Matahari. Kombinasi ini membantu menjaga suhu relatif stabil dan mendukung kehidupan.",
+      "createdBy": "seed",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "mat-mars-1",
+      "planetId": "mars",
+      "title": "Jejak Air di Mars",
+      "content": "Mars saat ini dingin dan kering, namun ada bukti bahwa dahulu pernah ada aliran air. Lembah, delta, dan mineral tertentu menunjukkan masa lalu yang lebih basah.",
+      "createdBy": "seed",
+      "createdAt": "2025-01-01T00:00:00.000Z",
+      "updatedAt": "2025-01-01T00:00:00.000Z"
+    }
+  ],
+  "questions": [
+    {
+      "id": "q-earth-1",
+      "planetId": "earth",
+      "prompt": "Apa yang paling berperan melindungi Bumi dari partikel bermuatan Matahari?",
+      "options": [
+        "Cincin planet",
+        "Magnetosfer",
+        "Gunung berapi",
+        "Awan asam sulfat"
+      ],
+      "correctIndex": 1,
+      "explanation": "Magnetosfer membelokkan banyak partikel bermuatan dari angin Matahari sehingga mengurangi dampaknya ke atmosfer.",
+      "createdBy": "seed",
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    },
+    {
+      "id": "q-mars-1",
+      "planetId": "mars",
+      "prompt": "Mengapa Mars sering disebut sebagai 'planet merah'?",
+      "options": [
+        "Banyak lautan merah",
+        "Debu kaya besi teroksidasi",
+        "Pencemaran cahaya",
+        "Awan merah pekat"
+      ],
+      "correctIndex": 1,
+      "explanation": "Permukaan Mars kaya mineral besi yang teroksidasi (karat) sehingga tampak kemerahan.",
+      "createdBy": "seed",
+      "createdAt": "2025-01-01T00:00:00.000Z"
+    }
+  ],
+  "quizAttempts": [
+    {
+      "id": "2b4caf2a-c0ed-4a0b-ad28-9173f22f2fea",
+      "userId": "75aa8e04-8fb1-4bd2-93fa-edece097ab99",
+      "planetId": "earth",
+      "score": 1,
+      "total": 1,
+      "results": [
+        {
+          "questionId": "q-earth-1",
+          "selectedIndex": 1,
+          "correctIndex": 1,
+          "isCorrect": true,
+          "explanation": "Magnetosfer membelokkan banyak partikel bermuatan dari angin Matahari sehingga mengurangi dampaknya ke atmosfer."
+        }
+      ],
+      "createdAt": "2025-12-26T07:47:16.484Z"
+    },
+    {
+      "id": "9877c977-d007-46bb-807e-5e4b6a4296b8",
+      "userId": "75aa8e04-8fb1-4bd2-93fa-edece097ab99",
+      "planetId": "mars",
+      "score": 1,
+      "total": 1,
+      "results": [
+        {
+          "questionId": "q-mars-1",
+          "selectedIndex": 1,
+          "correctIndex": 1,
+          "isCorrect": true,
+          "explanation": "Permukaan Mars kaya mineral besi yang teroksidasi (karat) sehingga tampak kemerahan."
+        }
+      ],
+      "createdAt": "2025-12-26T07:47:20.782Z"
+    }
+  ],
+  "progress": [
+    {
+      "userId": "75aa8e04-8fb1-4bd2-93fa-edece097ab99",
+      "visitedPlanets": [
+        "earth",
+        "mars"
+      ],
+      "points": 20,
+      "updatedAt": "2025-12-26T07:47:20.782Z"
+    },
+    {
+      "userId": "e5cfb710-a7b5-4e5a-b9a8-db73c18794ac",
+      "visitedPlanets": [],
+      "points": 0,
+      "updatedAt": "2025-12-26T07:47:48.252Z"
+    }
+  ]
+}
