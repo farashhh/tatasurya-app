@@ -4,7 +4,6 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "dev": "nodemon server.js",
     "start": "node server.js"
   },
   "dependencies": {
@@ -14,8 +13,5 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.3"
   }
 }
