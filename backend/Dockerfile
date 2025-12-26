@@ -4,6 +4,9 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --omit=dev
 
+# DEBUG: pastikan express benar-benar terinstall
+RUN node -p "require.resolve('express')"
+
 COPY . .
 
 ENV NODE_ENV=production
