@@ -83,7 +83,6 @@ function Planet({ planet, orbitRadius, size, speed, onSelect }) {
 function CameraFocus({ focus }) {
   const { camera } = useThree();
   useFrame((_, delta) => {
-    // Smoothly move camera a bit toward focus (if any)
     if (!focus) return;
     const target = new THREE.Vector3(focus[0] + 6, 4, focus[2] + 6);
     camera.position.lerp(target, 1 - Math.exp(-delta * 2.5));
@@ -101,26 +100,23 @@ function Scene({ planets, onSelect, focus }) {
       <Sun />
 
       {planets.map((p) => {
-        const orbitRadius = 2 + Math.log(p.distanceAU + 1) * 5;
-        const size = 0.25 + Math.log(p.radius + 1) * 0.65;
+        // Amanin agar distanceAU & radius selalu ada angka
+        const distanceAU = Number(p.distanceAU ?? p.distance_au ?? 0);
+        const radius = Number(p.radius ?? 1);
+
+        const orbitRadius = 2 + Math.log(distanceAU + 1) * 5;
+        const size = 0.25 + Math.log(radius + 1) * 0.65;
         const speed = 0.55 / Math.pow(orbitRadius, 0.75);
 
         return (
           <group key={p.id}>
             <OrbitRing radius={orbitRadius} />
-            <Planet
-              planet={p}
-              orbitRadius={orbitRadius}
-              size={size}
-              speed={speed}
-              onSelect={onSelect}
-            />
+            <Planet planet={p} orbitRadius={orbitRadius} size={size} speed={speed} onSelect={onSelect} />
           </group>
         );
       })}
 
       <OrbitControls enablePan enableZoom enableRotate />
-
       <CameraFocus focus={focus} />
     </>
   );
@@ -133,12 +129,25 @@ export default function Explore3D() {
 
   const [selected, setSelected] = useState(null);
   const [focus, setFocus] = useState(null);
-
   const [toast, setToast] = useState("");
 
   useEffect(() => {
-    api.get("/planets")
-      .then((res) => setPlanets(res.data.planets || []))
+    api
+      .get("/planets")
+      .then((res) => {
+        // backend kamu sekarang ngirim array langsung: [...]
+        // tapi kita bikin aman kalau suatu saat jadi { planets: [...] }
+        const raw = Array.isArray(res.data) ? res.data : (res.data?.planets ?? []);
+
+        const normalized = raw.map((p) => ({
+          ...p,
+          // normalize distance_au -> distanceAU
+          distanceAU: p.distanceAU ?? p.distance_au,
+        }));
+
+        setPlanets(normalized);
+      })
+      .catch(() => setPlanets([]))
       .finally(() => setLoading(false));
   }, []);
 
@@ -154,7 +163,7 @@ export default function Explore3D() {
       setToast(`✅ ${selected.name} ditandai sebagai dikunjungi (+5 poin)`);
       setTimeout(() => setToast(""), 2500);
     } catch (e) {
-      setToast(e?.response?.data?.error || "Gagal menyimpan progres");
+      setToast(e?.response?.data?.error || e?.response?.data?.message || "Gagal menyimpan progres");
       setTimeout(() => setToast(""), 2500);
     }
   }
@@ -186,7 +195,10 @@ export default function Explore3D() {
                   <LoadingSpinner label="Memuat planet..." />
                 </div>
               ) : (
-                <Canvas camera={{ position: [10, 7, 12], fov: 55 }} onPointerMissed={() => setSelected(null)}>
+                <Canvas
+                  camera={{ position: [10, 7, 12], fov: 55 }}
+                  onPointerMissed={() => setSelected(null)}
+                >
                   <Scene planets={planets} onSelect={onSelect} focus={focus} />
                 </Canvas>
               )}
@@ -206,7 +218,9 @@ export default function Explore3D() {
                     <div
                       className="h-10 w-10 rounded-full"
                       style={{
-                        background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), ${selected.color || "#888"} 55%, rgba(0,0,0,0.7))`,
+                        background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.7), ${
+                          selected.color || "#888"
+                        } 55%, rgba(0,0,0,0.7))`,
                       }}
                     />
                     <div className="min-w-0">
@@ -222,7 +236,7 @@ export default function Explore3D() {
                     </div>
                     <div className="glass rounded-2xl p-3">
                       <div className="text-xs text-white/60">Jarak (AU)</div>
-                      <div className="font-black">{selected.distanceAU}</div>
+                      <div className="font-black">{selected.distanceAU ?? selected.distance_au}</div>
                     </div>
                   </div>
 
@@ -239,9 +253,7 @@ export default function Explore3D() {
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 text-white/60 text-sm">
-                  Belum ada planet terpilih.
-                </div>
+                <div className="mt-4 text-white/60 text-sm">Belum ada planet terpilih.</div>
               )}
             </div>
 
@@ -249,8 +261,12 @@ export default function Explore3D() {
               <div className="font-black text-lg">Petunjuk</div>
               <ul className="mt-2 text-sm text-white/70 space-y-2 list-disc pl-5">
                 <li>Scroll untuk zoom, drag untuk rotasi kamera.</li>
-                <li>Tekan <b>Reset Fokus</b> untuk kembali ke pandangan awal.</li>
-                <li>Tombol <b>Kunjungi</b> akan menyimpan progres planet yang sudah dieksplor.</li>
+                <li>
+                  Tekan <b>Reset Fokus</b> untuk kembali ke pandangan awal.
+                </li>
+                <li>
+                  Tombol <b>Kunjungi</b> akan menyimpan progres planet yang sudah dieksplor.
+                </li>
               </ul>
             </div>
 
