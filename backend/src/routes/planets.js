@@ -1,19 +1,17 @@
 import { Router } from "express";
-import { getState } from "../db.js";
+import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
-router.get("/", (req, res) => {
-  const db = getState();
-  const planets = [...db.planets].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  res.json({ planets });
-});
+// GET /api/planets
+router.get("/", async (req, res) => {
+  const { data, error } = await supabase
+    .from("planets")
+    .select("*")
+    .order("order", { ascending: true });
 
-router.get("/:id", (req, res) => {
-  const db = getState();
-  const planet = db.planets.find(p => p.id === req.params.id);
-  if (!planet) return res.status(404).json({ error: "Planet tidak ditemukan" });
-  res.json({ planet });
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
 });
 
 export default router;
