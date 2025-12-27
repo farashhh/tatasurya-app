@@ -3,235 +3,363 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/client.js";
 import GalaxyBackground from "../components/GalaxyBackground.jsx";
 import LoadingSpinner from "../components/LoadingSpinner.jsx";
-import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Quiz() {
-  const { planetId: planetIdParam } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const params = useParams();
+
+  // kalau route kamu /quiz/:planetId
+  const initialPlanetId = params.planetId || "";
 
   const [planets, setPlanets] = useState([]);
-  const [planetId, setPlanetId] = useState(planetIdParam || "");
-  const [loadingPlanets, setLoadingPlanets] = useState(true);
+  const [planetId, setPlanetId] = useState(initialPlanetId);
 
-  const [questions, setQuestions] = useState([]);
+  const [loadingPlanets, setLoadingPlanets] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
-  const [answers, setAnswers] = useState({});
-  const [submitting, setSubmitting] = useState(false);
-
-  const [result, setResult] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [answers, setAnswers] = useState({}); // { [questionId]: selectedIndex }
   const [toast, setToast] = useState("");
 
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null); // { score,total,results:[] }
+
+  const answeredCount = useMemo(() => {
+    return Object.keys(answers).length;
+  }, [answers]);
+
+  // 1) Fetch planets
   useEffect(() => {
-    api.get("/planets")
-      .then((res) => setPlanets(res.data.planets || []))
-      .finally(() => setLoadingPlanets(false));
+    let mounted = true;
+    setLoadingPlanets(true);
+
+    api
+      .get("/planets")
+      .then((res) => {
+        // Support:
+        // A) res.data = [{...}, {...}]
+        // B) res.data = { planets: [...] }
+        const list = Array.isArray(res.data) ? res.data : res.data?.planets ?? [];
+        if (!mounted) return;
+        setPlanets(list);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setPlanets([]);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoadingPlanets(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
+  // 2) Fetch questions when planetId changes
   useEffect(() => {
-    if (!planetId) return;
-    setLoadingQuestions(true);
-    setQuestions([]);
-    setAnswers({});
-    setResult(null);
+    if (!planetId) {
+      setQuestions([]);
+      setAnswers({});
+      setResult(null);
+      return;
+    }
 
-    api.get("/questions", { params: { planetId } })
-      .then((res) => setQuestions(res.data.questions || []))
-      .catch((e) => {
-        setToast(e?.response?.data?.error || "Gagal memuat soal");
+    let mounted = true;
+    setLoadingQuestions(true);
+    setResult(null);
+    setAnswers({});
+
+    async function loadQuestions() {
+      try {
+        // Coba beberapa kemungkinan endpoint supaya “kebal”
+        // 1) GET /questions?planetId=earth
+        // 2) GET /questions/earth
+        // 3) GET /quiz/questions?planetId=earth
+        const tries = [
+          () => api.get("/questions", { params: { planetId } }),
+          () => api.get(`/questions/${planetId}`),
+          () => api.get("/quiz/questions", { params: { planetId } }),
+        ];
+
+        let res = null;
+        let lastErr = null;
+
+        for (const fn of tries) {
+          try {
+            res = await fn();
+            break;
+          } catch (e) {
+            lastErr = e;
+          }
+        }
+
+        if (!res) throw lastErr || new Error("Gagal memuat soal");
+
+        // Support:
+        // A) res.data = [{...}]
+        // B) res.data = { questions: [...] }
+        const list = Array.isArray(res.data) ? res.data : res.data?.questions ?? [];
+
+        if (!mounted) return;
+        setQuestions(list);
+      } catch (e) {
+        if (!mounted) return;
+        setQuestions([]);
+        setToast(e?.response?.data?.message || e?.response?.data?.error || "Gagal memuat soal");
         setTimeout(() => setToast(""), 2500);
-      })
-      .finally(() => setLoadingQuestions(false));
+      } finally {
+        if (!mounted) return;
+        setLoadingQuestions(false);
+      }
+    }
+
+    loadQuestions();
+
+    return () => {
+      mounted = false;
+    };
   }, [planetId]);
 
-  const selectedPlanet = useMemo(() => planets.find(p => p.id === planetId), [planets, planetId]);
+  function onPickPlanet(id) {
+    setPlanetId(id);
+    // kalau kamu mau URL berubah juga:
+    // navigate(`/quiz/${id}`);
+  }
 
-  const answeredCount = useMemo(() => Object.values(answers).filter(v => v !== null && v !== undefined).length, [answers]);
+  function setAnswer(questionId, selectedIndex) {
+    setAnswers((prev) => ({ ...prev, [questionId]: selectedIndex }));
+  }
 
   async function submit() {
     if (!planetId) return;
+
     if (questions.length === 0) {
-      setToast("Belum ada soal untuk planet ini.");
+      setToast("Soal belum tersedia untuk planet ini.");
+      setTimeout(() => setToast(""), 2500);
+      return;
+    }
+
+    // optional: wajib semua dijawab
+    if (answeredCount < questions.length) {
+      setToast("Jawab semua pertanyaan dulu ya 🙂");
       setTimeout(() => setToast(""), 2500);
       return;
     }
 
     setSubmitting(true);
-    setToast("");
-
-    const payloadAnswers = questions.map(q => ({
-      questionId: q.id,
-      selectedIndex: answers[q.id] ?? null,
-    }));
 
     try {
-      const res = await api.post("/quiz/submit", { planetId, answers: payloadAnswers });
-      setResult(res.data);
-      if (res.data.mode === "student") {
-        setToast(`Skor tersimpan. +${res.data.pointsAdded} poin`);
-      } else {
-        setToast("Mode preview guru: hasil tidak disimpan.");
+      const payload = {
+        planetId,
+        answers: questions.map((q) => ({
+          questionId: q.id,
+          selectedIndex: answers[q.id],
+        })),
+      };
+
+      // Coba beberapa kemungkinan endpoint submit
+      // 1) POST /quiz/submit
+      // 2) POST /quiz
+      // 3) POST /quiz/attempt
+      const tries = [
+        () => api.post("/quiz/submit", payload),
+        () => api.post("/quiz", payload),
+        () => api.post("/quiz/attempt", payload),
+      ];
+
+      let res = null;
+      let lastErr = null;
+
+      for (const fn of tries) {
+        try {
+          res = await fn();
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
       }
-      setTimeout(() => setToast(""), 3000);
+
+      if (!res) throw lastErr || new Error("Gagal submit");
+
+      // Support response:
+      // A) { score, total, results: [...] }
+      // B) { attempt: { score,total,results } }
+      const data = res.data?.attempt ?? res.data;
+
+      setResult({
+        score: data?.score ?? 0,
+        total: data?.total ?? questions.length,
+        results: data?.results ?? [],
+      });
+
+      setToast("✅ Jawaban terkirim!");
+      setTimeout(() => setToast(""), 2000);
     } catch (e) {
-      setToast(e?.response?.data?.error || "Gagal submit kuis");
+      setToast(e?.response?.data?.message || e?.response?.data?.error || "Gagal mengirim jawaban");
       setTimeout(() => setToast(""), 2500);
     } finally {
       setSubmitting(false);
     }
   }
 
+  function resetQuiz() {
+    setAnswers({});
+    setResult(null);
+  }
+
+  const selectedPlanet = useMemo(() => {
+    return planets.find((p) => p.id === planetId) || null;
+  }, [planets, planetId]);
+
   return (
     <GalaxyBackground>
       <div className="mx-auto max-w-5xl px-4 py-8">
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="btn-secondary" onClick={() => navigate("/explore")}>← Eksplorasi</button>
-          <div className="badge">Tantangan (Kuis)</div>
-          {selectedPlanet && <div className="badge">{selectedPlanet.name}</div>}
+        <div className="flex items-center gap-3 mb-5">
+          <div className="font-black text-2xl">Kuis</div>
+          <div className="badge">Interaktif</div>
           <div className="flex-1" />
-          <button className="btn-secondary" onClick={() => navigate("/progress")}>📊 Progres</button>
-          {user?.role === "guru" && <button className="btn-secondary" onClick={() => navigate("/teacher")}>👩‍🏫 Guru</button>}
+          <button className="btn-secondary" onClick={() => navigate("/explore")}>
+            ⟵ Kembali
+          </button>
         </div>
 
-        <div className="mt-6 grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 space-y-4">
-            <div className="glass rounded-3xl p-6 border border-white/10">
-              <div className="font-black text-lg">Pilih Planet</div>
-              <div className="text-white/60 text-sm mt-1">Kuis dikelompokkan berdasarkan planet.</div>
+        <div className="grid lg:grid-cols-3 gap-5 items-start">
+          {/* LEFT: Panel pilih planet */}
+          <div className="glass rounded-3xl p-6 border border-white/10 lg:col-span-1">
+            <div className="font-black text-xl">Pilih Planet</div>
+            <div className="text-white/60 text-sm mt-1">Kuis dikelompokkan berdasarkan planet.</div>
 
+            <div className="mt-4">
               {loadingPlanets ? (
-                <div className="mt-4"><LoadingSpinner label="Memuat daftar planet..." /></div>
+                <LoadingSpinner label="Memuat planet..." />
               ) : (
-                <select className="input mt-4" value={planetId} onChange={(e) => setPlanetId(e.target.value)}>
+                <select
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-4 py-3 outline-none"
+                  value={planetId}
+                  onChange={(e) => onPickPlanet(e.target.value)}
+                >
                   <option value="">— pilih planet —</option>
-                  {planets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {planets.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
               )}
+            </div>
 
-              <div className="mt-4 text-xs text-white/60">
-                Status: <b>{answeredCount}</b> / <b>{questions.length}</b> terjawab.
-              </div>
+            <div className="mt-4 text-white/70 text-sm">
+              Status: <b>{answeredCount}</b> / <b>{questions.length}</b> terjawab.
+            </div>
 
+            <div className="mt-5 flex gap-3">
               <button
-                className="btn-primary w-full mt-5"
-                disabled={!planetId || submitting || loadingQuestions}
+                className="btn-primary flex-1"
                 onClick={submit}
+                disabled={submitting || !planetId || loadingQuestions || questions.length === 0}
               >
                 {submitting ? "Mengirim..." : "Kirim Jawaban"}
               </button>
-
-              {toast && <div className="mt-4 text-sm text-indigo-200">{toast}</div>}
+              <button className="btn-secondary" onClick={resetQuiz} disabled={!planetId || loadingQuestions}>
+                Reset
+              </button>
             </div>
 
-            {result && (
-              <div className="glass rounded-3xl p-6 border border-white/10">
-                <div className="font-black text-lg">Hasil</div>
-                <div className="mt-2">
-                  <div className="text-white/60 text-sm">Skor</div>
-                  <div className="text-3xl font-black">{result.attempt.score} / {result.attempt.total}</div>
-                  <div className="text-white/60 text-xs mt-1">
-                    {result.mode === "student" ? "Tersimpan di progres Anda." : "Preview (tidak disimpan)."}
-                  </div>
-                </div>
+            {selectedPlanet && (
+              <div className="mt-5 glass rounded-2xl p-4 border border-white/10">
+                <div className="font-bold">{selectedPlanet.name}</div>
+                <div className="text-white/70 text-sm mt-1">{selectedPlanet.summary}</div>
+              </div>
+            )}
 
-                <div className="mt-4 flex gap-3">
-                  <button
-                    className="btn-secondary"
-                    onClick={() => {
-                      setAnswers({});
-                      setResult(null);
-                    }}
-                  >
-                    Ulangi
-                  </button>
-                  <button className="btn-secondary" onClick={() => navigate(`/knowledge/${planetId}`)}>
-                    📚 Materi
-                  </button>
-                </div>
+            {toast && (
+              <div className="mt-4 glass rounded-2xl p-4 border border-white/10">
+                <div className="text-sm">{toast}</div>
               </div>
             )}
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="glass rounded-3xl p-6 border border-white/10">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-white/60 text-sm">Soal</div>
-                  <div className="font-black text-xl">
-                    {selectedPlanet ? `Kuis: ${selectedPlanet.name}` : "Pilih planet dulu"}
-                  </div>
-                </div>
-                <div className="badge">{user?.role === "guru" ? "Guru (Preview)" : "Murid"}</div>
-              </div>
+          {/* RIGHT: Soal */}
+          <div className="glass rounded-3xl p-6 border border-white/10 lg:col-span-2">
+            <div className="flex items-center gap-3">
+              <div className="font-black text-xl">Pertanyaan</div>
+              <div className="badge">Pilih Opsi</div>
+            </div>
 
+            <div className="text-white/60 text-sm mt-1">
+              {planetId ? "Jawab semua pertanyaan lalu klik Kirim Jawaban." : "Silakan pilih planet terlebih dahulu."}
+            </div>
+
+            <div className="mt-5">
               {loadingQuestions ? (
-                <div className="mt-6"><LoadingSpinner label="Memuat soal..." /></div>
-              ) : !planetId ? (
-                <div className="mt-6 text-white/60 text-sm">
-                  Silakan pilih planet untuk menampilkan soal kuis.
+                <div className="py-10 flex items-center justify-center">
+                  <LoadingSpinner label="Memuat soal..." />
                 </div>
+              ) : !planetId ? (
+                <div className="py-10 text-white/60 text-sm">Belum memilih planet.</div>
               ) : questions.length === 0 ? (
-                <div className="mt-6 text-white/60 text-sm">
-                  Belum ada soal untuk planet ini. {user?.role === "guru" ? "Tambahkan soal di halaman Guru." : "Minta guru menambahkan soal."}
+                <div className="py-10 text-white/60 text-sm">
+                  Soal untuk planet ini belum tersedia.
                 </div>
               ) : (
-                <div className="mt-6 space-y-6">
+                <div className="space-y-4">
                   {questions.map((q, idx) => {
-                    const selectedIndex = answers[q.id];
-                    const resultRow = result?.results?.find(r => r.questionId === q.id);
+                    const picked = answers[q.id];
+                    const check = result?.results?.find((r) => r.questionId === q.id);
+
                     return (
-                      <div key={q.id} className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                      <div key={q.id} className="glass rounded-2xl p-5 border border-white/10">
                         <div className="flex items-start gap-3">
                           <div className="badge">{idx + 1}</div>
-                          <div className="font-bold leading-relaxed">{q.prompt}</div>
-                          <div className="flex-1" />
-                          {resultRow && (
-                            <div className={["badge", resultRow.isCorrect ? "bg-emerald-500/10 border-emerald-400/30" : "bg-rose-500/10 border-rose-400/30"].join(" ")}>
-                              {resultRow.isCorrect ? "Benar" : "Salah"}
-                            </div>
-                          )}
+                          <div className="font-bold leading-snug">{q.prompt}</div>
                         </div>
 
                         <div className="mt-4 grid gap-2">
-                          {q.options.map((opt, oi) => {
-                            const checked = selectedIndex === oi;
-                            const isCorrect = resultRow ? (oi === resultRow.correctIndex) : false;
-                            const isChosenWrong = resultRow ? (checked && !resultRow.isCorrect) : false;
+                          {(q.options || []).map((opt, optIdx) => {
+                            const isPicked = picked === optIdx;
 
-                            const borderClass = resultRow
-                              ? isCorrect
-                                ? "border-emerald-400/40 bg-emerald-500/10"
-                                : isChosenWrong
-                                  ? "border-rose-400/40 bg-rose-500/10"
-                                  : "border-white/10 bg-white/5"
-                              : "border-white/10 bg-white/5 hover:bg-white/10";
+                            // highlight kalau sudah submit
+                            const isCorrect = check && optIdx === check.correctIndex;
+                            const isWrongPicked = check && isPicked && !check.isCorrect;
 
                             return (
                               <label
-                                key={oi}
+                                key={optIdx}
                                 className={[
-                                  "flex items-center gap-3 rounded-2xl border px-4 py-3 cursor-pointer transition",
-                                  borderClass,
+                                  "flex items-center gap-3 rounded-2xl px-4 py-3 border cursor-pointer transition",
+                                  "bg-white/5 border-white/10 hover:border-white/20",
+                                  isPicked ? "border-indigo-400/60" : "",
+                                  isCorrect ? "border-emerald-400/60" : "",
+                                  isWrongPicked ? "border-rose-400/60" : "",
                                 ].join(" ")}
                               >
                                 <input
                                   type="radio"
                                   name={`q-${q.id}`}
-                                  checked={checked}
-                                  onChange={() => setAnswers((prev) => ({ ...prev, [q.id]: oi }))}
-                                  disabled={!!result}
+                                  value={optIdx}
+                                  checked={isPicked || false}
+                                  onChange={() => setAnswer(q.id, optIdx)}
+                                  disabled={!!result} // kunci jawaban setelah submit
                                 />
-                                <div className="text-sm text-white/85">{opt}</div>
+                                <span className="text-white/80">{opt}</span>
                               </label>
                             );
                           })}
                         </div>
 
-                        {resultRow?.explanation && (
-                          <div className="mt-4 text-sm text-white/70 border-t border-white/10 pt-4">
-                            <div className="font-semibold">Pembahasan:</div>
-                            <div className="mt-1">{resultRow.explanation}</div>
+                        {/* setelah submit tampilkan hasil per-soal */}
+                        {check && (
+                          <div className="mt-4 text-sm">
+                            {check.isCorrect ? (
+                              <div className="text-emerald-300 font-bold">✅ Benar</div>
+                            ) : (
+                              <div className="text-rose-300 font-bold">❌ Salah</div>
+                            )}
+                            {check.explanation && (
+                              <div className="text-white/70 mt-1">{check.explanation}</div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -240,6 +368,16 @@ export default function Quiz() {
                 </div>
               )}
             </div>
+
+            {/* Result summary */}
+            {result && (
+              <div className="mt-6 glass rounded-2xl p-5 border border-white/10">
+                <div className="font-black text-lg">Hasil Kuis</div>
+                <div className="text-white/70 mt-1">
+                  Skor: <b>{result.score}</b> / <b>{result.total}</b>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
