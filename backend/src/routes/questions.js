@@ -3,10 +3,11 @@ import { supabase } from "../lib/supabase.js";
 
 const router = Router();
 
-function mapQuestion(row) {
+function toClient(row) {
+  if (!row) return null;
   return {
     id: row.id,
-    planetId: row.planet_id,      // ✅ frontend pakai planetId
+    planetId: row.planet_id,
     prompt: row.prompt,
     options: row.options,
     correctIndex: row.correct_index,
@@ -16,81 +17,98 @@ function mapQuestion(row) {
   };
 }
 
-// GET /api/questions?planetId=...
+// GET /api/questions?planetId=mercury
 router.get("/", async (req, res) => {
-  const { planetId } = req.query;
-  const q = supabase
-    .from("questions")
-    .select("id,planet_id,prompt,options,correct_index,explanation,created_at,updated_at")
-    .order("created_at", { ascending: false });
+  try {
+    const planetId = req.query.planetId;
 
-  const query = planetId ? q.eq("planet_id", planetId) : q;
+    let q = supabase
+      .from("questions")
+      .select("id, planet_id, prompt, options, correct_index, explanation, created_at, updated_at")
+      .order("created_at", { ascending: true });
 
-  const { data, error } = await query;
-  if (error) return res.status(400).json({ error: error.message });
+    if (planetId) q = q.eq("planet_id", planetId);
 
-  return res.json({ questions: (data || []).map(mapQuestion) });
+    const { data, error } = await q;
+    if (error) return res.status(400).json({ error: error.message });
+
+    return res.json({ questions: (data || []).map(toClient) });
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
+  }
 });
 
 // POST /api/questions
 router.post("/", async (req, res) => {
-  const { planetId, prompt, options, correctIndex, explanation } = req.body;
+  try {
+    const { planetId, prompt, options, correctIndex, explanation } = req.body;
 
-  if (!planetId || !prompt || !Array.isArray(options) || options.length < 2) {
-    return res.status(400).json({ error: "planetId, prompt, options(min 2) wajib" });
+    if (!planetId || !prompt || !Array.isArray(options) || options.length < 2) {
+      return res.status(400).json({ error: "planetId, prompt, dan minimal 2 options wajib" });
+    }
+
+    const payload = {
+      planet_id: planetId,
+      prompt,
+      options,
+      correct_index: Number(correctIndex ?? 0),
+      explanation: explanation || null,
+      // ⚠️ PENTING: JANGAN kirim id sama sekali di sini
+      // id: null  <-- ini sumber error kamu
+    };
+
+    const { data, error } = await supabase
+      .from("questions")
+      .insert([payload])
+      .select("id, planet_id, prompt, options, correct_index, explanation, created_at, updated_at")
+      .single();
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ question: toClient(data) });
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
   }
-
-  const payload = {
-    planet_id: planetId,
-    prompt,
-    options,
-    correct_index: Number(correctIndex ?? 0),
-    explanation: explanation || "",
-  };
-
-  const { data, error } = await supabase
-    .from("questions")
-    .insert([payload])
-    .select("id,planet_id,prompt,options,correct_index,explanation,created_at,updated_at")
-    .single();
-
-  if (error) return res.status(400).json({ error: error.message });
-  return res.json({ question: mapQuestion(data) });
 });
 
 // PUT /api/questions/:id
 router.put("/:id", async (req, res) => {
-  const { id } = req.params;
-  const { planetId, prompt, options, correctIndex, explanation } = req.body;
+  try {
+    const { id } = req.params;
+    const { planetId, prompt, options, correctIndex, explanation } = req.body;
 
-  const payload = {
-    planet_id: planetId,
-    prompt,
-    options,
-    correct_index: Number(correctIndex ?? 0),
-    explanation: explanation || "",
-    updated_at: new Date().toISOString(),
-  };
+    const payload = {};
+    if (planetId !== undefined) payload.planet_id = planetId;
+    if (prompt !== undefined) payload.prompt = prompt;
+    if (options !== undefined) payload.options = options;
+    if (correctIndex !== undefined) payload.correct_index = Number(correctIndex);
+    if (explanation !== undefined) payload.explanation = explanation || null;
 
-  const { data, error } = await supabase
-    .from("questions")
-    .update(payload)
-    .eq("id", id)
-    .select("id,planet_id,prompt,options,correct_index,explanation,created_at,updated_at")
-    .single();
+    const { data, error } = await supabase
+      .from("questions")
+      .update(payload)
+      .eq("id", id)
+      .select("id, planet_id, prompt, options, correct_index, explanation, created_at, updated_at")
+      .single();
 
-  if (error) return res.status(400).json({ error: error.message });
-  return res.json({ question: mapQuestion(data) });
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ question: toClient(data) });
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
+  }
 });
 
 // DELETE /api/questions/:id
 router.delete("/:id", async (req, res) => {
-  const { id } = req.params;
+  try {
+    const { id } = req.params;
 
-  const { error } = await supabase.from("questions").delete().eq("id", id);
-  if (error) return res.status(400).json({ error: error.message });
+    const { error } = await supabase.from("questions").delete().eq("id", id);
+    if (error) return res.status(400).json({ error: error.message });
 
-  return res.json({ ok: true });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(500).json({ error: "Server error" });
+  }
 });
 
 export default router;
