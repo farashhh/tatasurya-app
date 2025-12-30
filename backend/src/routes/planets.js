@@ -34,4 +34,25 @@ router.get("/", async (req, res) => {
   }
 });
 
+// GET /api/planets/:id
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("planets")
+      .select("id,name,order,radius,distance_au,color,summary")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (error) return res.status(400).json({ error: error.message });
+    if (!data) return res.status(404).json({ error: "Planet tidak ditemukan" });
+
+    res.set("Cache-Control", "no-store");
+    return res.json({ planet: mapPlanet(data) });
+  } catch (e) {
+    return res.status(500).json({ error: e.message || "Server error" });
+  }
+});
+
+
 export default router;
